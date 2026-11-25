@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>ドットキャラ制作室</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="identity"><span class="mark" aria-hidden="true">◆</span><h1>ドットキャラ制作室</h1></div>
+    <div class="project-actions">
+      <button type="button" data-action="new">新規</button>
+      <button type="button" data-action="open">プロジェクトを開く</button>
+      <button type="button" class="primary" data-action="save">プロジェクトを保存</button>
+    </div>
+  </header>
+  <main class="workspace">
+    <div class="project-header">
+      <div><h2 id="project-name">読み込み中</h2><p id="project-spec"></p></div>
+      <button type="button" data-action="sample">サンプルを開く</button>
+    </div>
+    <nav id="tabs" aria-label="制作工程"></nav>
+    <div class="layout" id="workspace"></div>
+    <p id="status" class="status" role="status" aria-live="polite">サンプルを準備しています。</p>
+  </main>
+  <input type="file" id="file" hidden>
+</body>
+</html>
