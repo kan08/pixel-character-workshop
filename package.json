@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test"
+    "test": "node --test",
+    "pipeline": "node pipeline/runner.mjs",
+    "publish-preview": "node scripts/publish-preview.mjs"
   },
   "engines": {
     "node": ">=22"

@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Muse で回す 2D アニメ制作と工程別改善｜設計案 v2</title>
+<style>
+:root {
+  color-scheme: light;
+  --page:#f3f2ed; --paper:#fffefa; --ink:#222922; --muted:#526055; --line:#d5dcd0;
+  --accent:#265b48; --accent-strong:#123c2d; --production:#e4efe7; --production-line:#759180;
+  --improve:#f6ead7; --improve-line:#a17542; --amber:#76501e;
+  --neutral:#efefe8; --focus:#955517; --shadow:#29382a14;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme:dark;
+    --page:#171d19; --paper:#202821; --ink:#eff2e8; --muted:#b4c2b6; --line:#455248;
+    --accent:#a5d9bc; --accent-strong:#cfefda; --production:#273b31; --production-line:#87a994;
+    --improve:#3a3023; --improve-line:#c79d68; --amber:#f4cb94;
+    --neutral:#2a332b; --focus:#ffd6a0; --shadow:#0003;
+  }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--page); color:var(--ink); font-family:system-ui,-apple-system,"Hiragino Sans","Yu Gothic",Meiryo,sans-serif; line-height:1.75; }
+a { color:var(--accent); text-underline-offset:.22em; }
+button { font:inherit; color:inherit; cursor:pointer; }
+:focus-visible { outline:3px solid var(--focus); outline-offset:3px; }
+h1,h2,h3,p,figure { margin:0; }
+h1,h2,h3 { line-height:1.32; font-weight:750; }
+h1 { font-size:clamp(2rem,4.8vw,3.85rem); letter-spacing:-.045em; }
+h2 { font-size:clamp(1.48rem,3vw,2.25rem); letter-spacing:-.025em; }
+h3 { font-size:1.06rem; }
+small { font-size:.83rem; }
+code,pre { font-family:ui-monospace,"SF Mono",Consolas,monospace; }
+p,li,dd,td { overflow-wrap:anywhere; }
+.wrap { width:min(1200px,100% - clamp(32px,7vw,104px)); margin-inline:auto; }
+.skip { position:fixed; left:16px; top:12px; z-index:2; padding:8px 12px; background:var(--paper); transform:translateY(-150%); }
+.skip:focus { transform:none; }
+.masthead { border-top:6px solid var(--accent); border-bottom:1px solid var(--line); background:var(--paper); }
+.mast-row { padding-block:12px; display:flex; align-items:center; flex-wrap:wrap; justify-content:space-between; gap:2px 16px; }
+.brand { font-weight:750; color:var(--accent-strong); }
+.edition { color:var(--muted); font-size:.83rem; }
+.hero-intro { padding-block:clamp(24px,3vw,42px) 24px; }
+.hero-intro p { margin-top:14px; max-width:55rem; color:var(--muted); font-size:clamp(.99rem,1.5vw,1.15rem); }
+.overview-grid { display:grid; grid-template-columns:minmax(0,2.45fr) minmax(14rem,1fr); align-items:start; gap:clamp(16px,3vw,36px); }
+.overview-notes { border-top:2px solid var(--accent); }
+.overview-notes div { padding:14px 0; border-bottom:1px solid var(--line); }
+.overview-notes p { margin-top:6px; color:var(--muted); font-size:.92rem; }
+.overview-notes h2 { font-size:1.06rem; }
+.overview-notes div:nth-child(2) h2 { color:var(--amber); }
+.contents { display:flex; flex-wrap:wrap; gap:8px 21px; padding-block:19px; border-bottom:1px solid var(--line); font-size:.9rem; }
+.contents a { display:inline-block; min-height:32px; padding-block:3px; }
+.chapter { padding-block:clamp(32px,5.5vw,70px); border-bottom:1px solid var(--line); scroll-margin-top:12px; }
+.chapter .intro { margin-top:9px; max-width:64rem; color:var(--muted); }
+.chapter-grid { display:grid; grid-template-columns:minmax(0,1.75fr) minmax(16rem,1fr); gap:clamp(16px,3vw,32px); align-items:start; margin-top:18px; }
+.diagram { border:1px solid var(--line); border-radius:15px; overflow:hidden; background:var(--paper); box-shadow:0 5px 18px var(--shadow); min-width:0; }
+.diagram-bar { display:flex; align-items:center; justify-content:space-between; gap:6px 12px; padding:9px 15px; border-bottom:1px solid var(--line); }
+.diagram-bar strong { font-size:.94rem; line-height:1.35; }
+.zoom-open,.viewer button { border:1px solid var(--line); background:var(--paper); color:var(--accent-strong); border-radius:7px; font-size:.86rem; min-height:44px; padding:4px 10px; font-weight:700; }
+.zoom-open { flex:none; }
+.zoom-open:hover,.viewer button:hover { background:var(--production); }
+.map-preview { display:block; width:100%; border:0; margin:0; padding:0; background:var(--paper); cursor:zoom-in; }
+.map-preview:focus-visible { outline-offset:-4px; }
+.map-preview svg { display:block; width:100%; height:auto; }
+figcaption { padding:10px 15px; font-size:.86rem; line-height:1.65; color:var(--muted); border-top:1px solid var(--line); }
+svg text { fill:var(--ink); font-family:inherit; font-size:22px; }
+svg .section-name { font-size:22px; font-weight:750; fill:var(--accent-strong); }
+svg .label { font-size:25px; font-weight:750; }
+svg .detail { font-size:21px; fill:var(--muted); }
+svg .small { font-size:20px; fill:var(--muted); }
+svg .amber-text { fill:var(--amber); }
+svg .node { fill:var(--paper); stroke:var(--production-line); stroke-width:1.5; }
+svg .production { fill:var(--production); stroke:var(--production-line); stroke-width:1.5; }
+svg .improve { fill:var(--improve); stroke:var(--improve-line); stroke-width:1.5; }
+svg .neutral { fill:var(--neutral); stroke:var(--line); stroke-width:1.5; }
+svg .separate { stroke:var(--muted); stroke-width:1.5; stroke-dasharray:6 5; }
+svg .line,svg .feedback,svg .guide { fill:none; stroke-width:2.6; stroke-linejoin:round; }
+svg .line { stroke:var(--accent); }
+svg .feedback { stroke:var(--amber); stroke-dasharray:6 4; }
+svg .guide { stroke:var(--production-line); }
+svg .arrow { fill:var(--accent); }
+svg .arrow-feedback { fill:var(--amber); }
+.stack { display:grid; gap:14px; min-width:0; }
+.stack p { margin-top:6px; color:var(--muted); }
+.note { padding:13px 15px; background:var(--production); border-inline-start:3px solid var(--accent); border-radius:0 8px 8px 0; }
+.note p+p { margin-top:8px; }
+.note.improve-note { background:var(--improve); border-color:var(--improve-line); }
+.roles,.decisions { display:grid; gap:0; margin:16px 0 0; }
+.roles div,.decisions div { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,3fr); padding:10px 0; align-items:baseline; gap:4px 18px; border-top:1px solid var(--line); }
+dt { font-weight:750; }
+dd { margin:0; }
+.code-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:16px; }
+.code-card { min-width:0; border:1px solid var(--line); border-radius:10px; background:var(--paper); }
+.code-card h3 { padding:10px 14px; border-bottom:1px solid var(--line); }
+.code-result { grid-column:1/-1; }
+pre { margin:0; padding:12px 14px; font-size:.85rem; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; tab-size:2; }
+.subhead { margin-top:28px; font-size:1.2rem; }
+.copy { margin-top:11px; max-width:65rem; }
+.table-wrap { margin-top:17px; }
+table { width:100%; border-collapse:collapse; table-layout:fixed; background:var(--paper); font-size:.94rem; }
+th,td { padding:12px 13px; text-align:left; vertical-align:top; border:1px solid var(--line); }
+thead th { background:var(--neutral); }
+tbody th { color:var(--accent-strong); }
+table th:first-child { width:21%; }
+table th:last-child { width:24%; }
+.step-table th:first-child { width:15%; }
+.step-table th:last-child { width:22%; }
+.cell-label { display:none; }
+.decisions div { grid-template-columns:minmax(0,1fr) minmax(0,3.2fr); padding-block:14px; }
+.decisions p+p { margin-top:5px; }
+.choice { color:var(--accent-strong); font-weight:700; }
+footer { padding-block:22px 32px; color:var(--muted); font-size:.87rem; }
+footer ul { padding-inline-start:1.2em; margin:8px 0 0; }
+.viewer { width:min(1120px,100% - 24px); height:min(860px,100% - 24px); padding:0; border:1px solid var(--line); border-radius:14px; background:var(--paper); color:var(--ink); }
+.viewer[open] { display:flex; flex-direction:column; }
+.viewer::backdrop { background:#131b18bb; }
+.viewer-head,.viewer-tools,.viewer-bottom { display:flex; align-items:center; flex-wrap:wrap; gap:6px; padding:8px 13px; }
+.viewer-head { display:grid; grid-template-columns:minmax(0,1fr) auto; border-bottom:1px solid var(--line); }
+.viewer-head h2 { font-size:clamp(.99rem,2vw,1.25rem); }
+.viewer-tools { border-bottom:1px solid var(--line); }
+.viewer-tools button { min-width:44px; }
+.viewer-tools output { min-width:3.4em; text-align:center; color:var(--muted); font-variant-numeric:tabular-nums; }
+.pan-controls { display:flex; gap:5px; }
+.viewport { flex:1; min-height:95px; position:relative; overflow:hidden; touch-action:none; cursor:grab; background:var(--page); }
+.viewport:active { cursor:grabbing; }
+.viewport:focus-visible { outline-offset:-4px; }
+.canvas { position:absolute; inset:0 auto auto 0; transform-origin:0 0; }
+.canvas svg { display:block; width:100%; height:100%; background:var(--paper); }
+.viewer-bottom { display:block; border-top:1px solid var(--line); color:var(--muted); font-size:.79rem; max-height:180px; overflow:auto; }
+.viewer-bottom summary { cursor:pointer; color:var(--accent-strong); }
+@media (max-width:770px) {
+  .overview-grid,.chapter-grid { grid-template-columns:1fr; }
+  .diagram { max-width:730px; }
+  .overview-notes { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+  .table-wrap table,.table-wrap tbody { display:block; }
+  .table-wrap thead { position:absolute; width:1px; height:1px; padding:0; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  .table-wrap tr { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); margin-bottom:10px; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .table-wrap th,.table-wrap td,.step-table th:first-child,.step-table th:last-child { display:block; width:auto; border:none; padding:8px 10px; }
+  .table-wrap tbody th,.table-wrap td:last-child { grid-column:1/-1; background:var(--neutral); }
+  .cell-label { display:block; font-size:.77rem; color:var(--muted); font-weight:700; margin-bottom:2px; }
+}
+@media (max-width:500px) {
+  .overview-notes,.code-pair,.roles div,.decisions div { grid-template-columns:1fr; }
+  .overview-notes { gap:0; }
+  .overview-notes div { padding-block:10px; }
+  .diagram-bar { padding-inline:10px; }
+  .table-wrap tr { grid-template-columns:1fr; }
+  .table-wrap td+td { border-top:1px solid var(--line); }
+}
+@media (max-height:490px) { .viewer-bottom > p { display:none; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">本文へ</a>
+<header class="masthead">
+  <div class="wrap mast-row">
+    <span class="brand">Muse と 2D アニメ制作</span>
+    <span class="edition">設計案 v2 ・ 2026年11月25日</span>
+  </div>
+</header>
+<main id="main" class="wrap">
+  <section id="concept" aria-labelledby="page-title">
+    <div class="hero-intro">
+      <h1 id="page-title">2D アニメ制作と<br>工程別の改善サイクル</h1>
+      <p>Muse に言葉か画像を渡し、基準画を決めてから 2D アニメーションを作る。Muse が基準画 PNG、動く GIF、前版比較を対象版に固定して届ける。人は Muse の会話を窓口に実物を確認し、修正や採用を返す。</p>
+    </div>
+    <div class="overview-grid">
+      <figure class="diagram">
+        <div class="diagram-bar"><strong>図1　全体アーキテクチャ</strong><button type="button" class="zoom-open" data-open-viewer data-diagram-id="arch">図を拡大</button></div>
+        <button class="map-preview" type="button" aria-label="図1 全体アーキテクチャを拡大" data-open-viewer data-diagram-id="arch">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 540" id="arch" role="img" aria-labelledby="arch-title arch-desc" data-focus-x="355" data-focus-y="151">
+            <title id="arch-title">図1　全体アーキテクチャ</title>
+            <desc id="arch-desc">人と Muse の間で依頼、対象版の確認、修正、採用をやり取りする。Muse は裏側の独立 GitHub に依頼、版、採用を記録する。制作エンジンが基準画からアニメを作り、版固定のプレビューを Muse が人へ届ける。詰まりを工程別に記録し、検査や道具を改修して再検証し、次の制作へ反映する。PowerAI からは窓口、共有メモリ、改善サイクルの型を借り、専用リポジトリと独立した運用で回す。</desc>
+            <defs>
+              <marker id="arr-arch" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto-start-reverse" markerUnits="userSpaceOnUse"><path class="arrow" d="M0 0L9 4.5 0 9Z"/></marker>
+              <marker id="arr-arch-feedback" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="userSpaceOnUse"><path class="arrow-feedback" d="M0 0L9 4.5 0 9Z"/></marker>
+            </defs>
+            <rect class="production" x="15" y="15" width="690" height="263" rx="13"/>
+            <text class="section-name" x="31" y="47">レイヤー1　ループ①　2D アニメ制作</text>
+            <rect class="node" x="36" y="60" width="177" height="72" rx="8"/>
+            <rect class="node" x="267" y="60" width="176" height="72" rx="8"/>
+            <rect class="node" x="497" y="60" width="181" height="72" rx="8"/>
+            <g text-anchor="middle">
+              <text class="label" x="124.5" y="92">人</text><text class="detail" x="124.5" y="122">言葉／元絵付き</text>
+              <text class="label" x="355" y="92">Muse</text><text class="detail" x="355" y="122">会話と結果通知</text>
+              <text class="label" x="587.5" y="92">独立 GitHub</text><text class="detail" x="587.5" y="122">裏側の共有記録</text>
+            </g>
+            <path class="line" d="M215 98H265" marker-start="url(#arr-arch)" marker-end="url(#arr-arch)"/>
+            <path class="line" d="M445 98H495" marker-start="url(#arr-arch)" marker-end="url(#arr-arch)"/>
+            <rect class="node" x="36" y="181" width="177" height="67" rx="8"/>
+            <rect class="node" x="414" y="159" width="264" height="94" rx="8"/>
+            <g text-anchor="middle">
+              <text class="label" x="124.5" y="209">プレビュー</text><text class="detail" x="124.5" y="235">対象版に固定</text>
+              <text class="label" x="546" y="189">制作エンジン</text>
+              <text class="small" x="546" y="216">基準画からアニメ制作</text>
+              <text class="small" x="546" y="241">生成・検品・書き出し</text>
+              <text class="detail" x="314" y="204">PNG・GIF・比較</text>
+            </g>
+            <path class="line" d="M588 134V157" marker-start="url(#arr-arch)" marker-end="url(#arr-arch)"/>
+            <path class="line" d="M414 216H215" marker-end="url(#arr-arch)"/>
+            <path class="line" d="M124.5 181V148H355V134" marker-end="url(#arr-arch)"/>
+            <rect class="improve" x="15" y="304" width="690" height="97" rx="13"/>
+            <path class="feedback" d="M523 253V302" marker-end="url(#arr-arch-feedback)"/>
+            <path class="feedback" d="M651 304V255" marker-end="url(#arr-arch-feedback)"/>
+            <text class="section-name amber-text" x="31" y="339">ループ②　仕組み改善</text>
+            <text class="detail" x="31" y="373">工程を記録 → 改修 → 同じ素材で再検証</text>
+            <text class="small amber-text" x="463" y="336">詰まり</text>
+            <text class="small amber-text" x="551" y="373">次の制作へ反映</text>
+            <rect class="neutral separate" x="15" y="420" width="690" height="104" rx="10"/>
+            <text class="label" x="32" y="450">PowerAI</text>
+            <text class="detail" x="157" y="449">設計の参照先 ・ リポジトリと運用は独立</text>
+            <text class="small" x="32" y="479">借りる型　Muse 窓口・GitHub 共有メモリ・仕組み改善</text>
+            <text class="small" x="32" y="507">ゲーム開発工場と 2D アニメ制作は別リポジトリ・別運用</text>
+          </svg>
+        </button>
+        <figcaption>実線は依頼・成果・閲覧の経路。Muse が PNG・GIF・前版比較を会話で届ける。破線は制作で見つけた詰まりと、再検証した改善の受け渡しを示す。</figcaption>
+      </figure>
+      <aside class="overview-notes" aria-label="構成の要点">
+        <div><h2>人の窓口は Muse</h2><p>依頼から採用まで同じ会話で進む。GitHub は Muse と制作側が使う共有メモリ。</p></div>
+        <div><h2>ゴールは動く 2D アニメ</h2><p>基準画はキャラの顔や服を保って動かすための Step 1。繰り返す詰まりは発生した工程の検査や道具に還元する。</p></div>
+        <div><h2>PowerAI とは独立運用</h2><p>窓口・共有メモリ・改善の型を借りる。2D アニメ制作は専用リポジトリ、専用の配信・起動設定で回す。</p></div>
+      </aside>
+    </div>
+    <nav class="contents" aria-label="目次">
+      <a href="#flow">2つの始め方</a><a href="#contract">制作エンジンの境界</a><a href="#steps">制作の5ステップと工程別改善</a><a href="#muse-rules">Muse 完結の約束</a><a href="#preview">プレビューの確認方式</a><a href="#roadmap">最初の検証</a><a href="#review">決める論点</a>
+    </nav>
+  </section>
+
+  <section class="chapter" id="flow" aria-labelledby="flow-heading">
+    <h2 id="flow-heading">言葉だけでも、元絵を渡しても始められる</h2>
+    <p class="intro">右向きの歩きアニメを作る例。言葉から基準画を生成する場合も、画像を持ち込む場合も、アニメ制作に使う基準画の版を Muse で確定する。</p>
+    <div class="chapter-grid">
+      <figure class="diagram">
+        <div class="diagram-bar"><strong>図2　依頼から修正・採用まで</strong><button type="button" class="zoom-open" data-open-viewer data-diagram-id="flow-svg">図を拡大</button></div>
+        <button class="map-preview" type="button" aria-label="図2 依頼から修正・採用までを拡大" data-open-viewer data-diagram-id="flow-svg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 446" id="flow-svg" role="img" aria-labelledby="flow-title flow-desc" data-focus-x="150" data-focus-y="65">
+            <title id="flow-title">図2　依頼から修正・採用まで</title>
+            <desc id="flow-desc">言葉だけで頼むと基準画を新規生成し、手持ち画像を渡すと基準画の規格に揃える。どちらも Muse が基準画の対象版を届け、関門①で人がその版を確定する。採用済みで正規化済みの基準画は版を固定して再利用できる。その基準画で歩きアニメを作り、関門②で人が動く GIF と前版比較を見て修正または採用を返す。</desc>
+            <defs><marker id="arr-flow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path class="arrow" d="M0 0L10 5 0 10Z"/></marker></defs>
+            <rect class="production" x="17" y="17" width="329" height="97" rx="9"/>
+            <text class="label" x="34" y="50">A　言葉だけで依頼</text>
+            <text class="detail" x="34" y="82">画像生成で元絵を用意</text>
+            <rect class="production" x="374" y="17" width="329" height="97" rx="9"/>
+            <text class="label" x="391" y="50">B　元絵を添えて依頼</text>
+            <text class="detail" x="391" y="82">手持ちの画像を基準に揃える</text>
+            <path class="line" d="M181 115V147" marker-end="url(#arr-flow)"/>
+            <path class="line" d="M539 115V147" marker-end="url(#arr-flow)"/>
+            <rect class="production" x="17" y="149" width="686" height="75" rx="9"/>
+            <text class="label" x="34" y="180">関門①　Muse で基準画の版を確定</text>
+            <text class="detail" x="34" y="208">PNG を確認し、必要なら修正して採用</text>
+            <path class="line" d="M360 225V250" marker-end="url(#arr-flow)"/>
+            <rect class="node" x="17" y="252" width="686" height="75" rx="9"/>
+            <text class="label" x="34" y="283">採用した基準画で 2D アニメを制作</text>
+            <text class="detail" x="34" y="311">ポーズから全コマを揃え、動く GIF を書き出す</text>
+            <path class="line" d="M360 328V353" marker-end="url(#arr-flow)"/>
+            <rect class="production" x="17" y="355" width="686" height="75" rx="9"/>
+            <text class="label" x="34" y="386">関門②　Muse で動きを確認</text>
+            <text class="detail" x="34" y="414">対象版の GIF と前版比較を見て、修正・採用を返す</text>
+          </svg>
+        </button>
+        <figcaption>元絵は Antigravity や GPT などで生成できる。すでに採用・正規化した基準画を使う場合は、Muse がその版を指定して制作へ進む。</figcaption>
+      </figure>
+      <div class="stack">
+        <div class="note">
+          <h3>基準画が届いたら</h3>
+          <p>Muse が「基準画 v1 が見られます」と PNG のリンクを返す。「髪の色を変えて」で次版へ。「これで採用。次は右向きの歩きにして」で、採用した PNG を使うアニメ依頼へ進む。</p>
+        </div>
+        <div>
+          <h3>「左足が滑る。顔はそのまま」</h3>
+          <p>Muse は v1 を修正元として固定し、変更点と残す点を v2 の依頼に記録する。v2 には v1 との比較リンクを添える。</p>
+        </div>
+        <div>
+          <h3>「これで採用」</h3>
+          <p>採用は人が見た版に結び付けて記録する。返事がどの版を指すか曖昧なときは、Muse が対象版だけを確かめる。</p>
+        </div>
+        <div class="note improve-note">
+          <h3>「また足がズレた」</h3>
+          <p>今回の修正と並行して、対象版と再現条件を工程タグ付きで改善記録に残す。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter" id="contract" aria-labelledby="contract-heading">
+    <h2 id="contract-heading">エンジンを替えても、依頼と結果の形は共通</h2>
+    <p class="intro">Mac 上の受け渡し役が、裏側の GitHub にある依頼を1版分の作業フォルダに用意する。言葉だけなら job.json を置き、元絵や前版があれば参照パスと素材を加える。各ツール向けの変換と書き出しは接続処理が担当する。</p>
+    <div class="chapter-grid">
+      <figure class="diagram">
+        <div class="diagram-bar"><strong>図3　制作エンジンと最小の入出力</strong><button type="button" class="zoom-open" data-open-viewer data-diagram-id="contract-svg">図を拡大</button></div>
+        <button class="map-preview" type="button" aria-label="図3 制作エンジンと最小の入出力を拡大" data-open-viewer data-diagram-id="contract-svg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 473" id="contract-svg" role="img" aria-labelledby="contract-title contract-desc" data-focus-x="165" data-focus-y="108">
+            <title id="contract-title">図3　制作エンジンと最小の入出力</title>
+            <desc id="contract-desc">どちらの依頼も job.json を使う。A は inputs を空にして基準画を生成する。B は基準画や前版を入力に置き、inputs にパスを書いてアニメ化や修正を依頼する。エンジンは差し替え可能な接続処理を通じて result.json と成果物を出力する。受け渡し役が出力を確認し、裏側の GitHub に記録する。Muse は対象版のプレビューを会話で届ける。</desc>
+            <defs><marker id="arr-contract" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path class="arrow" d="M0 0L10 5 0 10Z"/></marker></defs>
+            <rect class="node" x="17" y="17" width="686" height="121" rx="9"/>
+            <text class="label" x="33" y="50">共通の入力　job.json</text>
+            <rect class="neutral" x="33" y="58" width="313" height="66" rx="7"/>
+            <rect class="neutral" x="359" y="58" width="328" height="66" rx="7"/>
+            <text class="section-name" x="47" y="85">A　言葉だけで新規生成</text>
+            <text class="small" x="47" y="113">inputs は空（画像なし）</text>
+            <text class="section-name" x="373" y="85">B　元絵・前版あり</text>
+            <text class="small" x="373" y="113">inputs に画像のパスを書く</text>
+            <path class="line" d="M360 139V162" marker-end="url(#arr-contract)"/>
+            <rect class="production" x="17" y="164" width="686" height="112" rx="9"/>
+            <text class="section-name" x="33" y="195">差し替え境界　エンジン用の接続処理</text>
+            <g text-anchor="middle">
+              <rect class="node" x="33" y="209" width="140" height="47" rx="7"/>
+              <rect class="node" x="183" y="209" width="147" height="47" rx="7"/>
+              <rect class="node" x="340" y="209" width="170" height="47" rx="7"/>
+              <rect class="node" x="520" y="209" width="167" height="47" rx="7"/>
+              <text class="detail" x="103" y="241">Codex</text>
+              <text class="detail" x="256.5" y="241">Antigravity</text>
+              <text class="detail" x="425" y="241">GPT 画像生成等</text>
+              <text class="detail" x="603.5" y="241">変換スクリプト</text>
+            </g>
+            <path class="line" d="M360 277V300" marker-end="url(#arr-contract)"/>
+            <rect class="node" x="17" y="302" width="686" height="76" rx="9"/>
+            <text class="label" x="33" y="335">共通の出力　result.json と output/</text>
+            <text class="detail" x="33" y="362">基準画 PNG、アニメ GIF・シート、検査結果</text>
+            <path class="line" d="M360 379V393"/>
+            <path class="line" d="M360 393H182V402" marker-end="url(#arr-contract)"/>
+            <path class="line" d="M360 393H537V402" marker-end="url(#arr-contract)"/>
+            <rect class="production" x="17" y="404" width="331" height="52" rx="9"/>
+            <rect class="production" x="372" y="404" width="331" height="52" rx="9"/>
+            <text class="detail" x="182" y="437" text-anchor="middle">裏側の GitHub に記録</text>
+            <text class="detail" x="537" y="437" text-anchor="middle">Muse から対象版を案内</text>
+          </svg>
+        </button>
+        <figcaption>接続処理は複数のツールを組み合わせられる。受け渡し役が成果物と検査結果を保存し、配信先に閲覧用の成果物を渡す。Muse が確認待ちになった版を会話で届ける。</figcaption>
+      </figure>
+      <div class="stack">
+        <div class="note">
+          <h3>アニメを修正する版のフォルダ例</h3>
+          <pre>jobs/walk-017/v2/
+  job.json
+  input/character.png
+  input/previous.gif
+  result.json
+  output/walk.gif
+  output/frames.png
+  output/frames.json</pre>
+        </div>
+        <div>
+          <h3>言葉だけの依頼は画像なしで渡す</h3>
+          <p>Step 1 の作業フォルダに置く入力は job.json だけ。基準画 PNG を採用したら、その版を参照してアニメ制作へ進み、GIF とスプライトシート PNG・フレーム情報 JSON を出す。</p>
+        </div>
+      </div>
+    </div>
+    <h3 class="subhead">JSON の例</h3>
+    <p class="copy">Phase 0 用の提案。依頼 ID は制作 Issue からたどれる識別子、版は同じ依頼の中で増える番号。基準画を採用してアニメ化へ進むときは、採用した PNG を参照する別の依頼を起票する。</p>
+    <div class="code-pair">
+      <div class="code-card">
+        <h3>A　job.json <small>／ 言葉だけで基準画を作る</small></h3>
+        <pre>{
+  "jobId": "character-016",
+  "revision": 1,
+  "baseRevision": null,
+  "kind": "illustration",
+  "request": "緑の雨合羽のキャラで右向きの歩きアニメ。まず基準画から",
+  "inputs": {}
+}</pre>
+      </div>
+      <div class="code-card">
+        <h3>B　job.json <small>／ 元絵を使って歩きの前版を直す</small></h3>
+        <pre>{
+  "jobId": "walk-017",
+  "revision": 2,
+  "baseRevision": 1,
+  "kind": "animation",
+  "request": "左足が滑る。顔はそのまま",
+  "change": "左足の接地を直す",
+  "keep": "顔と右向きの歩き",
+  "inputs": {
+    "reference": "input/character.png",
+    "previous": "input/previous.gif"
+  }
+}</pre>
+      </div>
+      <div class="code-card code-result">
+        <h3>result.json <small>／ B の依頼にエンジンが返す結果</small></h3>
+        <pre>{
+  "jobId": "walk-017",
+  "revision": 2,
+  "artifacts": ["output/walk.gif", "output/frames.png", "output/frames.json"],
+  "preview": "output/walk.gif",
+  "checks": [
+    {"name": "gif-decode", "status": "pass"},
+    {"name": "frame-count", "status": "pass"},
+    {"name": "loop-seam", "status": "pass"},
+    {"name": "sheet-layout", "status": "pass"},
+    {"name": "sheet-json", "status": "pass"}
+  ]
+}</pre>
+      </div>
+    </div>
+    <p class="copy"><code>kind</code> は <code>illustration</code>、<code>pixel</code>、<code>animation</code> のいずれか。初版は <code>baseRevision</code> を <code>null</code> にする。<code>inputs</code> に、元絵があれば <code>reference</code>、前版があれば <code>previous</code> を書く。どちらもないときは <code>inputs</code> を空にするか省略する。パスは作業フォルダ内の相対パス。実行前に入力の版を固定し、結果の ID・版の一致、出力の存在、用途ごとの必須検査を確かめてから版を保存する。検査結果は <code>pass</code>、<code>fail</code>、<code>skipped</code> で表す。</p>
+    <h3 class="subhead">誰が何を記録するか</h3>
+    <dl class="roles">
+      <div><dt>Muse</dt><dd>依頼の原文と、指定があれば元絵・変える点・残す点を起票する。結果や要確認点を知らせ、人の修正指示と採用した版を記録する。</dd></div>
+      <div><dt>独立 GitHub</dt><dd>制作 Issue が依頼と進行状態・採用履歴の正本。版フォルダは入出力の記録。改善記録は制作 Issue や該当版を参照する。</dd></div>
+      <div><dt>制作エンジン</dt><dd>版ごとの入力を読み、生成・修正・検品・書き出しを行う。接続処理がツールの違いを吸収する。</dd></div>
+      <div><dt>プレビュー配信</dt><dd>対象版に固定した閲覧 URL を返す。受け渡し役が Issue に URL を記録し、Muse はその版とリンクを取得する。</dd></div>
+      <div><dt>改善サイクル</dt><dd>工程タグ、再現条件、変更効果を記録し、採用した検査・道具・手順を該当工程の次の制作に反映する。</dd></div>
+    </dl>
+    <p class="copy"><strong>状態の提案</strong>　受付 → 制作中 → 確認待ち → 採用。修正は次版を受付に戻す。生成や配信が止まった場合は、止まった箇所・理由・再開先を Issue に残す。確認待ちにする条件は、成果物の保存と対象版の閲覧経路の確認がそろうこと。</p>
+  </section>
+
+  <section class="chapter" id="steps" aria-labelledby="steps-heading">
+    <h2 id="steps-heading">レイヤー2　制作の5ステップと工程別改善</h2>
+    <p class="intro">基準画で姿を決め、キーポーズで動きを設計し、全コマを揃えてから書き出す。Muse で動く実物を見て違和感があれば、原因の工程だけを修正し、その出力を使って後続工程を更新する。</p>
+    <div class="chapter-grid">
+      <figure class="diagram">
+        <div class="diagram-bar"><strong>図4　5ステップ・症状別の手戻り・工程別改善</strong><button type="button" class="zoom-open" data-open-viewer data-diagram-id="steps-svg">図を拡大</button></div>
+        <button class="map-preview" type="button" aria-label="図4 5ステップ・症状別の手戻り・工程別改善を拡大" data-open-viewer data-diagram-id="steps-svg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 768" id="steps-svg" role="img" aria-labelledby="steps-title steps-desc" data-focus-x="144" data-focus-y="93">
+            <title id="steps-title">図4　5ステップ・症状別の手戻り・工程別改善</title>
+            <desc id="steps-desc">Step 1 は基準画を検品し、関門①で人が確定する。Step 2 はキーポーズ、Step 3 は中割りと全コマ、Step 4 は組立、出荷ゲート、書き出し。Step 5 の関門②では Muse から届く動く GIF を見て、人が修正または採用を決める。修正時は、基準画の顔・服・色なら Step 1、足踏みや重心なら Step 2、特定コマの顔や崩れなら Step 3、テンポや滑りなら Step 4 に戻る。改善は step1 から step4 の工程タグ付きで記録し、検査・道具を優先して改修する。同じ再現素材で前後を比較し、該当工程の標準に反映する。</desc>
+            <defs>
+              <marker id="arr-steps" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="userSpaceOnUse"><path class="arrow" d="M0 0L9 4.5 0 9Z"/></marker>
+              <marker id="arr-steps-return" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="userSpaceOnUse"><path class="arrow-feedback" d="M0 0L9 4.5 0 9Z"/></marker>
+            </defs>
+            <text class="section-name" x="18" y="36">アニメ制作と確認</text>
+            <text class="section-name amber-text" x="374" y="36">症状で戻り先を選ぶ</text>
+            <rect class="production" x="17" y="55" width="319" height="70" rx="9"/>
+            <rect class="node" x="17" y="144" width="319" height="70" rx="9"/>
+            <rect class="node" x="17" y="233" width="319" height="70" rx="9"/>
+            <rect class="node" x="17" y="322" width="319" height="70" rx="9"/>
+            <rect class="production" x="17" y="411" width="319" height="102" rx="9"/>
+            <text class="label" x="32" y="83">Step 1　基準画</text>
+            <text class="small" x="32" y="109">透過・欠け ／ 関門①で確定</text>
+            <text class="label" x="32" y="172">Step 2　キーポーズ</text>
+            <text class="small" x="32" y="198">頭身・床ライン・左右差</text>
+            <text class="label" x="32" y="261">Step 3　中割り・全コマ</text>
+            <text class="small" x="32" y="287">寸法・足元基準点・保護領域</text>
+            <text class="label" x="32" y="350">Step 4　組立・書き出し</text>
+            <text class="small" x="32" y="376">出荷ゲートでコマ数・ループ</text>
+            <text class="label" x="32" y="440">Step 5　Muse で実物確認</text>
+            <text class="small" x="32" y="467">関門②　動く GIF を目視</text>
+            <text class="small" x="32" y="493">採用なら、見た版を確定</text>
+            <path class="line" d="M176 125V142" marker-end="url(#arr-steps)"/>
+            <path class="line" d="M176 214V231" marker-end="url(#arr-steps)"/>
+            <path class="line" d="M176 303V320" marker-end="url(#arr-steps)"/>
+            <path class="line" d="M176 392V409" marker-end="url(#arr-steps)"/>
+            <rect class="improve" x="374" y="55" width="298" height="70" rx="9"/>
+            <rect class="improve" x="374" y="144" width="298" height="70" rx="9"/>
+            <rect class="improve" x="374" y="233" width="298" height="70" rx="9"/>
+            <rect class="improve" x="374" y="322" width="298" height="70" rx="9"/>
+            <rect class="improve" x="374" y="435" width="298" height="52" rx="9"/>
+            <text class="detail" x="390" y="83">顔ズレ・服や色の違い</text>
+            <text class="small" x="390" y="109">基準画から直す場合</text>
+            <text class="detail" x="390" y="172">足踏み・不自然な重心</text>
+            <text class="small" x="390" y="198">姿勢と体重移動を見直す</text>
+            <text class="detail" x="390" y="261">1コマ崩れ・一部の顔ズレ</text>
+            <text class="small" x="390" y="287">該当コマだけ差し替える</text>
+            <text class="detail" x="390" y="350">テンポ・足元の滑り</text>
+            <text class="small" x="390" y="376">時間・基準点・書き出し設定</text>
+            <text class="detail amber-text" x="390" y="468">修正する場合</text>
+            <path class="feedback" d="M336 461H372" marker-end="url(#arr-steps-return)"/>
+            <path class="feedback" d="M374 90H338" marker-end="url(#arr-steps-return)"/>
+            <path class="feedback" d="M374 179H338" marker-end="url(#arr-steps-return)"/>
+            <path class="feedback" d="M374 268H338" marker-end="url(#arr-steps-return)"/>
+            <path class="feedback" d="M374 357H338" marker-end="url(#arr-steps-return)"/>
+            <path class="feedback" d="M672 461H696V90H674" marker-end="url(#arr-steps-return)"/>
+            <path class="feedback" d="M696 179H674" marker-end="url(#arr-steps-return)"/>
+            <path class="feedback" d="M696 268H674" marker-end="url(#arr-steps-return)"/>
+            <path class="feedback" d="M696 357H674" marker-end="url(#arr-steps-return)"/>
+            <rect class="improve" x="17" y="534" width="686" height="216" rx="11"/>
+            <text class="section-name amber-text" x="32" y="565">工程別の改善ループ</text>
+            <rect class="node" x="34" y="583" width="298" height="62" rx="7"/>
+            <rect class="node" x="388" y="583" width="298" height="62" rx="7"/>
+            <rect class="node" x="388" y="671" width="298" height="62" rx="7"/>
+            <rect class="node" x="34" y="671" width="298" height="62" rx="7"/>
+            <text class="detail" x="48" y="609">記録</text><text class="small" x="48" y="633">step1〜step4 と再現素材</text>
+            <text class="detail" x="402" y="609">改修　ハード ＞ ソフト</text><text class="small" x="402" y="633">検査・道具を優先</text>
+            <text class="detail" x="402" y="697">同じ再現素材で前後比較</text><text class="small" x="402" y="721">効果と別箇所への影響を確認</text>
+            <text class="detail" x="48" y="697">該当 Step の標準へ昇格</text><text class="small" x="48" y="721">次の制作に自動適用</text>
+            <path class="feedback" d="M332 614H386" marker-end="url(#arr-steps-return)"/>
+            <path class="feedback" d="M537 645V669" marker-end="url(#arr-steps-return)"/>
+            <path class="feedback" d="M388 702H334" marker-end="url(#arr-steps-return)"/>
+          </svg>
+        </button>
+        <figcaption>実線は制作順。上段の破線は、Muse の目視で見つけた症状から修正する工程への戻り先。下段は、再現し検証できた改修を次の制作に取り込む順序。</figcaption>
+      </figure>
+      <div class="stack">
+        <div>
+          <h3>手戻りは原因に当たる工程から</h3>
+          <p>顔や服の違いが基準画にあれば Step 1、一部のコマに限られるなら Step 3。足踏みや体重移動は Step 2、1コマの崩れや小物落ちは Step 3。テンポや足元の滑りは Step 4 の表示時間・基準点・書き出し設定を直す。</p>
+        </div>
+        <div class="note improve-note">
+          <h3>再発は工程タグ付きで記録する</h3>
+          <p>検品失敗や差し戻しから、対象版、発生工程、原文、期待する状態と再現素材を残す。原因に応じて <code>step1</code>〜<code>step4</code> を付ける。Step 5 で気づいた症状も、原因の工程に結び付ける。</p>
+        </div>
+        <div>
+          <h3>検査や道具で防げる箇所から改修</h3>
+          <p>切り抜き、位置揃え、パレット統一、GIF のコマ数などは、検査やスクリプトを先に直す。顔やポーズが安定しない場合は、参照画像の渡し方、ポーズガイド、プロンプトを調整する。同じ素材で改修前後を比較し、副作用も確かめてから該当工程の標準に反映する。</p>
+        </div>
+      </div>
+    </div>
+    <h3 class="subhead">各工程の処理と検品</h3>
+    <div class="table-wrap">
+      <table class="step-table" aria-label="2D アニメ制作の工程別の処理・検品・改善先">
+        <thead><tr><th scope="col">工程</th><th scope="col">主な処理</th><th scope="col">自動検品</th><th scope="col">人間確認</th><th scope="col">改善還元先</th></tr></thead>
+        <tbody>
+          <tr>
+            <th scope="row">Step 1<br>基準画</th>
+            <td><span class="cell-label" aria-hidden="true">主な処理</span>言葉から生成、または持ち込み画像を解像度・透過・向き・床ライン・足元基準点で正規化。</td>
+            <td><span class="cell-label" aria-hidden="true">自動検品</span>解像度、透過、キャラの欠け、背景ゴミ。</td>
+            <td><span class="cell-label" aria-hidden="true">人間確認</span><strong>関門①</strong>。Muse で顔・服・雰囲気を確認し、基準画の版を確定。</td>
+            <td><span class="cell-label" aria-hidden="true">改善還元先</span><code>step1</code>　正規化・切り抜きスクリプト、基準画の生成プロンプト。</td>
+          </tr>
+          <tr>
+            <th scope="row">Step 2<br>キーポーズ</th>
+            <td><span class="cell-label" aria-hidden="true">主な処理</span>右足・左足の前接地など、動作を特徴づける姿勢を作る。</td>
+            <td><span class="cell-label" aria-hidden="true">自動検品</span>基準画との頭身比、床ライン、左右の姿勢の差。</td>
+            <td><span class="cell-label" aria-hidden="true">人間確認</span>初回や崩れた場合に、必要に応じて Muse で確認。</td>
+            <td><span class="cell-label" aria-hidden="true">改善還元先</span><code>step2</code>　ポーズガイド生成、参照画像の渡し方。</td>
+          </tr>
+          <tr>
+            <th scope="row">Step 3<br>中割り・全コマ</th>
+            <td><span class="cell-label" aria-hidden="true">主な処理</span>基準画とキーポーズを参照し、間のコマを作って同じ枠と足元基準点に揃える。</td>
+            <td><span class="cell-label" aria-hidden="true">自動検品</span>寸法、透過、保護領域の差分。ドット絵はパレットと格子も確認。</td>
+            <td><span class="cell-label" aria-hidden="true">人間確認</span>Step 5 でまとめて確認。</td>
+            <td><span class="cell-label" aria-hidden="true">改善還元先</span><code>step3</code>　基準点の自動位置揃え、保護マスク合成。</td>
+          </tr>
+          <tr>
+            <th scope="row">Step 4<br>組立・書き出し</th>
+            <td><span class="cell-label" aria-hidden="true">主な処理</span>コマ順・表示時間・ループを設定。同一版から GIF、前版比較、スプライトシート PNG と JSON を用意。</td>
+            <td><span class="cell-label" aria-hidden="true">自動検品</span><strong>出荷ゲート</strong>。GIF の複数コマとループの継ぎ目、シートの重複・はみ出し、JSON の整合。</td>
+            <td><span class="cell-label" aria-hidden="true">人間確認</span>通過した版を Step 5 に渡す。失敗時は制作側で再試行または原因を記録。</td>
+            <td><span class="cell-label" aria-hidden="true">改善還元先</span><code>step4</code>　時間設定、位置補正、書き出しスクリプトと検査。</td>
+          </tr>
+          <tr>
+            <th scope="row">Step 5<br>Muse で実物確認</th>
+            <td><span class="cell-label" aria-hidden="true">主な処理</span>Muse が版固定の GIF と前版比較を会話で届け、修正・採用を受け付ける。</td>
+            <td><span class="cell-label" aria-hidden="true">自動検品</span>品質の最終判定は人が行う。</td>
+            <td><span class="cell-label" aria-hidden="true">人間確認</span><strong>関門②</strong>。自然さ、可愛さ、動きの気持ちよさを目視し、同じ会話で採否を返す。</td>
+            <td><span class="cell-label" aria-hidden="true">改善還元先</span>再発した制作上の指摘は原因の Step へ。閲覧・通知の問題は配信・通知の改善記録へ。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="chapter" id="muse-rules" aria-labelledby="muse-rules-heading">
+    <h2 id="muse-rules-heading">Muse だけで完結する4つの約束</h2>
+    <p class="intro">人の操作は Muse の会話と、会話から直接開けるプレビューで完結する。記録や制作側との受け渡しは Muse と運用側が担う。</p>
+    <dl class="roles">
+      <div><dt>① 言葉でも画像付きでも受付</dt><dd>キャラと元絵の有無、作りたい動作、変える点、残す点を Muse が短く確認する。合意したら、原文を添えて制作依頼を記録する。</dd></div>
+      <div><dt>② 対象版を会話で連絡</dt><dd>新たに確認待ちとなった版を、対象と版を明記して知らせる。基準画 PNG・動く GIF・前版比較は、版固定 URL か直接表示で届ける。変更点、検品結果、見てほしい点、返し方も添える。</dd></div>
+      <div><dt>③ 見ている版に返事を結ぶ</dt><dd>修正指示は原文と変える点・残す点を見た版に結び付け、次版を起票する。採用は見た版を固定する。採用した基準画はアニメ制作の参照に使う。版が曖昧なら対象版だけを確認する。</dd></div>
+      <div><dt>④ 詰まりを同時に記録</dt><dd>再発の指摘や、同じ版で検品失敗・差し戻しが2回以上起きたときは、今回の制作を進めながら対象版・工程タグ・原文・期待する状態を改善記録に残す。</dd></div>
+    </dl>
+    <p class="copy"><a href="muse-2d-prompt.md">Muse 運用プロンプト（muse-2d-prompt.md）</a></p>
+  </section>
+
+  <section class="chapter" id="preview" aria-labelledby="preview-heading">
+    <h2 id="preview-heading">Muse が版を知らせ、人がスマホで実物を見る</h2>
+    <p class="intro">Muse が会話で届けた URL または直接表示から、スマホで対象版の PNG と動く GIF を見られるようにする。修正版は同じ案内から前版と比較できるようにする。</p>
+    <div class="table-wrap">
+      <table aria-label="プレビューの案内方式と裏側の緊急フォールバック">
+        <thead><tr><th scope="col">方式</th><th scope="col">Muse の扱い</th><th scope="col">スマホでの見え方</th><th scope="col">公開範囲と使いどころ</th></tr></thead>
+        <tbody>
+          <tr>
+            <th scope="row">静的プレビュー URL<br><small>Pages 型</small></th>
+            <td><span class="cell-label" aria-hidden="true">Muse の扱い</span>記録した版と閲覧 URL を対応づけ、会話で直接案内する。</td>
+            <td><span class="cell-label" aria-hidden="true">スマホでの見え方</span>1ページで PNG や GIF、前後比較を見せやすい。ログイン済みならリンクから開ける構成にする。</td>
+            <td><span class="cell-label" aria-hidden="true">公開範囲と使いどころ</span>配信先の認証を別に設定する。公開可能な試験素材から始め、非公開素材は認証設定と実機でのアクセスを確認してから出す。</td>
+          </tr>
+          <tr>
+            <th scope="row">Muse チャット内添付</th>
+            <td><span class="cell-label" aria-hidden="true">Muse の扱い</span>添付を対象版に結び付けて直接表示する。添付の取得、再掲、前版比較の見せ方を検証する。</td>
+            <td><span class="cell-label" aria-hidden="true">スマホでの見え方</span>インライン再生ができれば最短。静止表示やリンク化、サイズ制限、再訪時の表示を実際の Muse で試す。</td>
+            <td><span class="cell-label" aria-hidden="true">公開範囲と使いどころ</span>添付の共有先と保存期間を確認して使う。表示が安定しない場合は、版固定の閲覧 URL を案内する。</td>
+          </tr>
+          <tr>
+            <th scope="row">非公開 GitHub の直接参照<br><small>裏側の緊急フォールバック</small></th>
+            <td><span class="cell-label" aria-hidden="true">Muse の扱い</span>配信に障害があるとき、権限のある Muse や運用側が対象版のファイルを取得する。</td>
+            <td><span class="cell-label" aria-hidden="true">スマホでの見え方</span>Muse に直接表示するか、復旧した版固定プレビューを Muse が案内する。</td>
+            <td><span class="cell-label" aria-hidden="true">公開範囲と使いどころ</span>取得は運用側の既存権限の範囲。復旧後に確認できる版を通知する。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note copy">
+      <h3>Phase 0 の案　Muse から版ごとの静的ページを開く</h3>
+      <p>公開可能な試験用の PNG と GIF で往復を試す。非公開素材は認証付きの閲覧ページか、共有範囲を確認した Muse 添付で届ける。静的配信では、配信する各ホストのページ URL と画像 URL を、許可済み端末と未ログイン端末で確認する。</p>
+      <p><a href="https://developers.cloudflare.com/pages/configuration/preview-deployments/">Cloudflare Pages のプレビュー仕様</a>、<a href="https://developers.cloudflare.com/pages/platform/known-issues/#enable-access-on-your-pagesdev-domain">既定ホストの Access 設定</a></p>
+    </div>
+  </section>
+
+  <section class="chapter" id="roadmap" aria-labelledby="roadmap-heading">
+    <h2 id="roadmap-heading">言葉だけの依頼で一往復し、詰まりを1件直す</h2>
+    <p class="intro">Phase 0 は言葉だけで 2D アニメを依頼し、基準画の確定から GIF の修正・採用までを Muse で試す。基準画と短い動画素材は手動生成か既存の試験素材を使える。</p>
+    <div class="chapter-grid">
+      <figure class="diagram">
+        <div class="diagram-bar"><strong>図5　最初の検証から定常運用まで</strong><button type="button" class="zoom-open" data-open-viewer data-diagram-id="roadmap-svg">図を拡大</button></div>
+        <button class="map-preview" type="button" aria-label="図5 最初の検証から定常運用までを拡大" data-open-viewer data-diagram-id="roadmap-svg">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 438" id="roadmap-svg" role="img" aria-labelledby="roadmap-title roadmap-desc" data-focus-x="277" data-focus-y="79">
+            <title id="roadmap-title">図5　最初の検証から定常運用まで</title>
+            <desc id="roadmap-desc">Phase 0 は Muse に言葉だけでアニメを依頼し、スマホで基準画を確定する。試験用 GIF のテンポを Step 4 で直し、前版と比較して採用する。実際の詰まり1件を工程タグ付きで記録し、同じ入力で改修前後を確かめる。Phase 1 は実生成エンジンをつなぎ、基準画からアニメ制作を試す。Phase 2 は自動検品と工程別改善を日々の制作に組み込む。</desc>
+            <defs><marker id="arr-roadmap" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path class="arrow" d="M0 0L10 5 0 10Z"/></marker></defs>
+            <rect class="production" x="17" y="17" width="686" height="115" rx="10"/>
+            <text class="section-name" x="34" y="52">Phase 0</text>
+            <text class="label" x="148" y="52">Muse でアニメ制作の往復を試す</text>
+            <text class="detail" x="148" y="85">スマホで基準画を確定し、GIF を修正・採用</text>
+            <text class="detail" x="148" y="112">詰まりを工程タグ付きで1件記録し、改修</text>
+            <path class="line" d="M75 133V159" marker-end="url(#arr-roadmap)"/>
+            <rect class="node" x="17" y="161" width="686" height="115" rx="10"/>
+            <text class="section-name" x="34" y="196">Phase 1</text>
+            <text class="label" x="148" y="196">実生成エンジンを接続する</text>
+            <text class="detail" x="148" y="229">新規・持ち込みの基準画からアニメ化を試す</text>
+            <text class="detail" x="148" y="256">同じ入出力で保存・通知・閲覧</text>
+            <path class="line" d="M75 277V303" marker-end="url(#arr-roadmap)"/>
+            <rect class="improve" x="17" y="305" width="686" height="115" rx="10"/>
+            <text class="section-name amber-text" x="34" y="340">Phase 2</text>
+            <text class="label" x="148" y="340">検品と改善を日々の制作へ</text>
+            <text class="detail" x="148" y="373">繰り返す不具合を検査・道具に反映</text>
+            <text class="detail" x="148" y="400">改修前後と別素材で効果を確かめる</text>
+          </svg>
+        </button>
+        <figcaption>各段階で得た結果を次の段階の入力にする。接続先や自動化の範囲は、その時点で見つかった詰まりから決める。</figcaption>
+      </figure>
+      <div class="stack">
+        <div>
+          <h3>Phase 0 の完了条件</h3>
+          <p>スマホで Muse の通知から基準画 PNG を開いて確定し、動く GIF を再生する。「テンポを遅くして」で Step 4 を更新し、Muse から届く次版と前版を比較して採用を返す。運用側は、実際の詰まり1件を工程タグ付きで記録・改修し、同じ素材で前後を確かめる。</p>
+        </div>
+        <div>
+          <h3>Phase 1 の完了条件</h3>
+          <p>実生成エンジンをつなぎ、言葉だけの依頼と元絵の持ち込みからそれぞれアニメ制作を試す。同じ形式で結果を保存し、Muse が対象版を届ける。</p>
+        </div>
+        <div>
+          <h3>Phase 2 の完了条件</h3>
+          <p>壊れた出力は制作側で止まり、人に見せるものは検品結果と版が追える。改善前後を同じ条件で比較し、別素材で副作用を確かめる。手戻り回数や初回の閲覧までの時間は、記録できた実績を使う。</p>
+        </div>
+      </div>
+    </div>
+    <div class="note improve-note copy">
+      <h3>最初の改善候補　1コマで止まる GIF を検知する</h3>
+      <p>たとえば動くはずの GIF が静止したら、<code>step4</code> と書き出し条件を記録する。完成ファイルのコマ数を調べる検査を加え、失敗素材が止まり、正常素材が通ることを確かめる。Phase 0 では実際に起きた詰まりを選ぶ。</p>
+    </div>
+  </section>
+
+  <section class="chapter" id="review" aria-labelledby="review-heading">
+    <h2 id="review-heading">最初に決める7つの論点</h2>
+    <p class="intro">各項目の「初案」は Phase 0 を通すための提案。Muse の実接続、スマホでの添付再生、非公開プレビューの挙動は実環境での確認が必要。</p>
+    <dl class="decisions">
+      <div><dt>1. Mac 側の起動</dt><dd><p><span class="choice">初案は手動起動。</span>運用側が Muse から受け付けた依頼を指定し、基準画 PNG と動く GIF の試験版を登録する。人への連絡は Muse が行う。制作側の起動を自動化する段階で、ポーリングか Webhook を選ぶ。</p><p>ポーリングは受信口を設けずに始めやすいが、Mac の停止や巡回間隔で待ちが出る。Webhook は早く動き出せる一方、到達できる受信口と再送時の重複対策が要る。</p></dd></div>
+      <div><dt>2. プレビューの公開範囲</dt><dd><p><span class="choice">初案は公開可能な試験用 PNG・GIF を Muse から案内。</span>非公開素材は認証付きの版固定ページか、共有範囲を確認した Muse 添付で届ける。期限付きリンクを使う場合は、転送できる素材の範囲と期限切れ後の案内を決める。</p><p>配信には閲覧用の成果物だけを渡す。持ち込んだ元絵を外部生成先へ渡せる範囲、過去版の保持、公開停止の担当も決める。</p></dd></div>
+      <div><dt>3. 版の修正と工程改善</dt><dd><p><span class="choice">初案は次版の修正と工程別の改善記録を並行。</span>基準画の「髪の色を変えて」や歩きの「左足を直して」は、見た版に紐付けて次版へ。「また同じ条件で足がズレた」は原因の工程タグ付きで改善記録にも残す。受け渡しを止める詰まりは、1回でも改善候補にできる。</p><p>検査や変換で防げる問題から直す。絵柄やポーズの問題は参考例やプロンプトを調整し、いずれも同じ再現素材で前後を比較する。</p></dd></div>
+      <div><dt>4. 差し替えの入出力</dt><dd><p><span class="choice">初案は1版1フォルダと2つの JSON。</span>テキストのみの新規生成と、画像を参照する修正・アニメ化を共通の入出力で扱う。手動で素材を返す段階から実生成をつないだ後まで、同じ形式で結果が戻るかを試す。対応できない用途は理由付きで返す。</p><p>用途ごとの追加情報が必要になったら任意フィールドから始める。互換性を壊す変更が必要になった段階で契約の版番号を導入する。</p></dd></div>
+      <div><dt>5. 自動検品と人の目</dt><dd><p><span class="choice">初案はファイルの破損と明示仕様を自動検査。</span>基準画では指定サイズや透過、GIF ではコマ数やループの継ぎ目などを調べる。判定しきい値は実例で検出漏れと過検出を確かめて決める。</p><p>人は関門①で基準画の姿を確定する。関門②では出荷ゲート通過後の GIF を Muse から見て、自然さや動きの気持ちよさを最終判定する。</p></dd></div>
+      <div><dt>6. PowerAI との距離</dt><dd><p><span class="choice">運用は別リポジトリ・別設定。</span>Muse が両方を扱う場合も、2D アニメの依頼は専用リポジトリへ送る。配信・起動・ワーカーの設定も制作側で持つ。</p><p>ゲーム用ラベル、3レーン、Playtester、自動マージはゲーム開発側の運用。PowerAI の停止中も、Muse からアニメ制作と版固定のプレビューを試せる構成にする。</p></dd></div>
+      <div><dt>7. 再送・失敗・採用の整合</dt><dd><p><span class="choice">初案は依頼ごとに制作中の版を1つにし、依頼 ID と版の組で重複実行を防ぐ。</span>処理と配信が別々に失敗する場合に備え、保存済み成果があれば配信から再開する。試行を打ち切る回数・費用は実生成をつなぐ際に決める。</p><p>通知と採用は人が見た版にひも付ける。アニメ化へ進むときは採用した PNG の版を入力に固定する。同時修正や複数候補を扱う段階では、版の発行と競合時の扱いを先に決める。</p></dd></div>
+    </dl>
+  </section>
+</main>
+<footer class="wrap">
+  <p>設計の元資料と参照先</p>
+  <ul>
+    <li><a href="muse-cycle-draft.md">Muse 完結の 2D アニメ制作 × 工程別改善サイクル v0.2</a>（設計メモ）</li>
+    <li><a href="muse-2d-prompt.md">Muse 運用プロンプト v0.1</a>（2D アニメ制作専用）</li>
+    <li>PowerAI の <a href="../../PowerAI/docs/architecture.md">アーキテクチャ</a>と<a href="../../PowerAI/muse/muse-complete-prompt.md">Muse 運用資料</a>（設計の参照先）</li>
+  </ul>
+</footer>
+<dialog id="diagram-viewer" class="viewer" aria-labelledby="viewer-title">
+  <div class="viewer-head">
+    <h2 id="viewer-title">拡大図</h2>
+    <button type="button" id="viewer-close" autofocus>閉じる</button>
+  </div>
+  <div class="viewer-tools" role="group" aria-label="図の表示操作">
+    <button type="button" id="zoom-out" aria-label="図を縮小">−</button>
+    <output id="zoom-level" aria-label="倍率">100%</output>
+    <button type="button" id="zoom-in" aria-label="図を拡大">＋</button>
+    <button type="button" id="fit-view">全体表示</button>
+    <button type="button" id="readable-view">100% 表示</button>
+    <div class="pan-controls" role="group" aria-label="図の移動">
+      <button type="button" data-pan="left" aria-label="図の左側を見る">←</button>
+      <button type="button" data-pan="up" aria-label="図の上側を見る">↑</button>
+      <button type="button" data-pan="down" aria-label="図の下側を見る">↓</button>
+      <button type="button" data-pan="right" aria-label="図の右側を見る">→</button>
+    </div>
+  </div>
+  <div class="viewport" id="viewer-viewport" tabindex="0" role="region" aria-label="拡大図。ドラッグまたは矢印キーで移動できます">
+    <div class="canvas" id="viewer-canvas"></div>
+  </div>
+  <div class="viewer-bottom">
+    <p>図をドラッグして移動、2本指で拡大。上のボタンでも操作できます。</p>
+    <details><summary>図の内容を文章で読む</summary><p id="viewer-description"></p></details>
+  </div>
+</dialog>
+<script>
+'use strict';
+const DiagramMath = {
+  bounds(s, vw, vh, dw=1180, dh=640) {
+    const cw=dw*s.scale,ch=dh*s.scale, margin=24;
+    return {...s,x:cw<=vw?(vw-cw)/2:Math.min(margin,Math.max(vw-cw-margin,s.x)),y:ch<=vh?(vh-ch)/2:Math.min(margin,Math.max(vh-ch-margin,s.y))};
+  },
+  zoom(s, next, ax, ay) { return {scale:next,x:ax-(ax-s.x)*next/s.scale,y:ay-(ay-s.y)*next/s.scale}; },
+  fit(vw,vh,dw=1180,dh=640) {const scale=Math.min((vw-24)/dw,(vh-24)/dh);return {scale,x:(vw-dw*scale)/2,y:(vh-dh*scale)/2};},
+  centerAfterResize(s,ow,oh,nw,nh){return {...s,x:s.x+(nw-ow)/2,y:s.y+(nh-oh)/2};},
+  focus(value,size,origin=0){const n=value===null||String(value).trim()===''?NaN:Number(value);return Number.isFinite(n)&&n>=origin&&n<=origin+size?n-origin:size/2;},
+  distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y);},
+  midpoint(a,b){return{x:(a.x+b.x)/2,y:(a.y+b.y)/2};}
+};
+if (typeof module !== 'undefined' && module.exports) module.exports=DiagramMath;
+if (typeof document !== 'undefined') (() => {
+  const dialog=document.getElementById('diagram-viewer'),viewport=document.getElementById('viewer-viewport'),canvas=document.getElementById('viewer-canvas'),level=document.getElementById('zoom-level');
+  const pointers=new Map(); let state={scale:1,x:0,y:0},gesture=null,viewMode='readable',opener=null,previousBodyOverflow='',lastSize={w:0,h:0};
+  const defaultSVG=document.querySelector('.map-preview svg');
+  let dw=1180,dh=640,focusX=590,focusY=320;
+  function setDiagram(original){
+    if(!original)throw new Error('Diagram opener has no SVG target');
+    const source=original.cloneNode(true),ids=new Map();
+    [source,...source.querySelectorAll('[id]')].filter(el=>el.id).forEach(el=>{ids.set(el.id,'viewer-'+el.id);el.id='viewer-'+el.id;});
+    [source,...source.querySelectorAll('*')].forEach(el=>{for(const attr of [...el.attributes]){let v=attr.value;for(const [oldID,newID] of ids){v=v.replaceAll('url(#'+oldID+')','url(#'+newID+')');if(attr.name==='aria-labelledby'||attr.name==='aria-describedby')v=v.split(/\s+/).map(x=>x===oldID?newID:x).join(' ');if((attr.name==='href'||attr.name==='xlink:href')&&v==='#'+oldID)v='#'+newID;}if(v!==attr.value)el.setAttribute(attr.name,v);}});
+    const viewBox=(source.getAttribute('viewBox')||'').trim().split(/[\s,]+/).map(Number);
+    if(viewBox.length!==4||!viewBox.every(Number.isFinite)||!(viewBox[2]>0&&viewBox[3]>0))throw new Error('Diagram needs a valid viewBox');
+    dw=viewBox[2];dh=viewBox[3];focusX=DiagramMath.focus(source.getAttribute('data-focus-x'),dw,viewBox[0]);focusY=DiagramMath.focus(source.getAttribute('data-focus-y'),dh,viewBox[1]);
+    canvas.style.width=dw+'px';canvas.style.height=dh+'px';canvas.textContent='';canvas.append(source);
+    const title=source.querySelector?.('title')?.textContent,description=source.querySelector?.('desc')?.textContent;
+    document.getElementById('viewer-title').textContent=title||'図';
+    document.getElementById('viewer-description').textContent=description||'この図の説明は未指定です。';
+  }
+  setDiagram(defaultSVG);
+  function dims(){return{w:viewport.clientWidth,h:viewport.clientHeight};}
+  function minScale(w,h){return Math.min(1,Math.max(.05,DiagramMath.fit(w,h,dw,dh).scale*.8));}
+  function render(){const{w,h}=dims();state=DiagramMath.bounds(state,w,h,dw,dh);canvas.style.transform=`translate(${state.x}px,${state.y}px) scale(${state.scale})`;level.value=Math.round(state.scale*100)+'%';level.textContent=level.value;}
+  function scaleTo(next,anchor){viewMode='manual';const{w,h}=dims();next=Math.max(minScale(w,h),Math.min(3,next));state=DiagramMath.zoom(state,next,anchor?.x??w/2,anchor?.y??h/2);render();}
+  function fit(){viewMode='fit';const{w,h}=dims();state=DiagramMath.fit(w,h,dw,dh);render();}
+  function readable(){viewMode='readable';const{w,h}=dims();state={scale:1,x:w/2-focusX,y:h/2-focusY};render();}
+  function local(e){const r=viewport.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};}
+  function rebase(){const ps=[...pointers.values()];gesture=ps.length>=2?{kind:'pinch',start:{...state},mid:DiagramMath.midpoint(ps[0],ps[1]),distance:Math.max(1,DiagramMath.distance(ps[0],ps[1]))}:ps.length===1?{kind:'pan',start:{...state},point:ps[0]}:null;}
+  function clearPointers(){pointers.clear();gesture=null;}
+  document.querySelectorAll('[data-open-viewer]').forEach(button=>button.addEventListener('click',()=>{const target=button.dataset.diagramId?document.getElementById(button.dataset.diagramId):defaultSVG;if(!button.dataset.diagramId&&document.querySelectorAll('.map-preview svg').length>1)throw new Error('Multiple diagrams require data-diagram-id on every opener');setDiagram(target);opener=button;dialog.showModal();previousBodyOverflow=document.body.style.overflow;document.body.style.overflow='hidden';clearPointers();lastSize=dims();readable();document.getElementById('viewer-close').focus();}));
+  document.getElementById('viewer-close').addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('close',()=>{clearPointers();document.body.style.overflow=previousBodyOverflow;opener?.focus();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)clearPointers();});
+  document.getElementById('zoom-in').addEventListener('click',()=>scaleTo(state.scale*1.25));
+  document.getElementById('zoom-out').addEventListener('click',()=>scaleTo(state.scale/1.25));
+  document.getElementById('fit-view').addEventListener('click',fit);
+  document.getElementById('readable-view').addEventListener('click',readable);
+  function pan(dir){viewMode='manual';const{w,h}=dims(),step=Math.max(90,Math.min(w,h)*.28);state.x+=dir==='left'?step:dir==='right'?-step:0;state.y+=dir==='up'?step:dir==='down'?-step:0;render();}
+  document.querySelectorAll('[data-pan]').forEach(b=>b.addEventListener('click',()=>pan(b.dataset.pan)));
+  viewport.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'&&e.button!==0)return;viewMode='manual';viewport.setPointerCapture(e.pointerId);pointers.set(e.pointerId,local(e));rebase();});
+  viewport.addEventListener('pointermove',e=>{if(!pointers.has(e.pointerId))return;pointers.set(e.pointerId,local(e));const ps=[...pointers.values()];if(gesture?.kind==='pan'&&ps.length===1){state={...gesture.start,x:gesture.start.x+ps[0].x-gesture.point.x,y:gesture.start.y+ps[0].y-gesture.point.y};render();}else if(gesture?.kind==='pinch'&&ps.length>=2){const mid=DiagramMath.midpoint(ps[0],ps[1]),{w,h}=dims(),min=Math.max(.05,DiagramMath.fit(w,h,dw,dh).scale*.8);const scale=Math.max(min,Math.min(3,gesture.start.scale*DiagramMath.distance(ps[0],ps[1])/gesture.distance));state=DiagramMath.zoom(gesture.start,scale,gesture.mid.x,gesture.mid.y);state.x+=mid.x-gesture.mid.x;state.y+=mid.y-gesture.mid.y;render();}});
+  function endPointer(e){if(pointers.delete(e.pointerId))rebase();}
+  ['pointerup','pointercancel','lostpointercapture'].forEach(type=>viewport.addEventListener(type,endPointer));
+  viewport.addEventListener('wheel',e=>{viewMode='manual';e.preventDefault();const unit=e.deltaMode===1?16:e.deltaMode===2?dims().h:1,dx=e.deltaX*unit,dy=e.deltaY*unit;if(e.ctrlKey||e.metaKey){scaleTo(state.scale*Math.exp(-dy*.004),local(e));}else{state.x-=dx;state.y-=dy;render();}},{passive:false});
+  viewport.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;const dirs={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down'};if(dirs[e.key])pan(dirs[e.key]);else if(e.key==='+'||e.key==='=')scaleTo(state.scale*1.25);else if(e.key==='-')scaleTo(state.scale/1.25);else if(e.key==='Home')fit();else return;e.preventDefault();});
+  new ResizeObserver(()=>{if(!dialog.open)return;const{w,h}=dims();if(viewMode==='fit')state=DiagramMath.fit(w,h,dw,dh);else{if(lastSize.w&&lastSize.h)state=DiagramMath.centerAfterResize(state,lastSize.w,lastSize.h,w,h);state=DiagramMath.zoom(state,Math.max(minScale(w,h),Math.min(3,state.scale)),w/2,h/2);}lastSize={w,h};clearPointers();render();}).observe(viewport);
+})();
+</script>
+</body>
+</html>

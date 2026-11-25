@@ -1,3 +1,6 @@
 .DS_Store
 node_modules/
 *.pixel-project.json
+/jobs/
+/preview/
+/.pipeline.lock
