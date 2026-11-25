@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ちびキャラ 2Dアニメ比較｜v1 → v2 → ①精密ロック → ③ボーン駆動ハイブリッド</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --ink: #1b2430;
+    --muted: #5a6675;
+    --line: #dde3ec;
+    --accent: #2463eb;
+    --ok: #15803d;
+    --ok-bg: #ecfdf3;
+    --warn: #b45309;
+    --warn-bg: #fffbeb;
+    --purple: #6d28d9;
+    --purple-bg: #f5f3ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11161d;
+      --card: #1a212c;
+      --ink: #e9eef5;
+      --muted: #9aa7b8;
+      --line: #2b3646;
+      --accent: #60a5fa;
+      --ok: #4ade80;
+      --ok-bg: #0f291c;
+      --warn: #fbbf24;
+      --warn-bg: #2c2008;
+      --purple: #c4b5fd;
+      --purple-bg: #251942;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 20px 16px 64px;
+  }
+  h1 { font-size: 1.45rem; margin: 0 0 6px; }
+  .sub { color: var(--muted); font-size: 0.92rem; margin: 0 0 22px; }
+  section {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 20px;
+  }
+  h2 { font-size: 1.15rem; margin: 0 0 12px; }
+  .compare {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+    gap: 12px;
+  }
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .panel.highlight { border-color: var(--accent); border-width: 2px; }
+  .panel.rig { border-color: var(--purple); border-width: 2px; }
+  .badge {
+    display: inline-block;
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-bottom: 8px;
+  }
+  .badge.old { background: var(--warn-bg); color: var(--warn); }
+  .badge.new { background: var(--ok-bg); color: var(--ok); }
+  .badge.rig { background: var(--purple-bg); color: var(--purple); }
+  .badge.guide { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+  .panel img {
+    display: block;
+    margin: 6px auto 10px;
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+  }
+  .meta { font-size: 0.8rem; color: var(--muted); margin: 0; }
+  .strip-label { font-size: 0.82rem; font-weight: 700; color: var(--muted); margin: 14px 0 6px; }
+  .strip-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px;
+    background: #eef2f7;
+  }
+  .strip-wrap img {
+    display: block;
+    height: 104px;
+    width: auto;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>ちびキャラ 2Dアニメ比較：v1 → v2 → ①精密ロック → ③ボーン駆動</h1>
+  <p class="sub">同じ基準画・同じ総時間（歩き 560ms / 攻撃 600ms）で4段階を並べて見比べられます。</p>
+
+  <section>
+    <h2>1. 歩き（Walk）— 計 560ms</h2>
+    <div class="compare">
+      <div class="panel">
+        <span class="badge old">v1 · 4コマ均等</span>
+        <img src="walk-v1.gif" alt="歩き v1" />
+        <p class="meta">140ms×4<br>テキストのみ生成</p>
+      </div>
+      <div class="panel">
+        <span class="badge guide">v2 · 8コマ素出し</span>
+        <img src="walk-v2.gif" alt="歩き v2" />
+        <p class="meta">色ガイド＋2バッチ<br>頭頂ガタつき 6.96px</p>
+      </div>
+      <div class="panel highlight">
+        <span class="badge new">① v2-locked · 精密ロック</span>
+        <img src="walk-v2-locked.gif" alt="歩き v2 精密ロック" />
+        <p class="meta">個別倍率＋Lanczos補正<br>頭頂ガタつき 2.25px</p>
+      </div>
+      <div class="panel rig">
+        <span class="badge rig">③ v3-rig · ボーン駆動</span>
+        <img src="walk-v3-rig.gif" alt="歩き v3 ボーン駆動" />
+        <p class="meta">基準画顔100%＋骨格追従<br>頭・接地ズレ 0.0px</p>
+      </div>
+    </div>
+    <div class="strip-label">① 精密ロック（AIコマ描き） 全8コマ</div>
+    <div class="strip-wrap"><img src="walk-v2-locked-strip.png" alt="歩き v2-locked 全8コマ" /></div>
+    <div class="strip-label">③ ボーン駆動ハイブリッド 全8コマ</div>
+    <div class="strip-wrap"><img src="walk-v3-rig-strip.png" alt="歩き v3-rig 全8コマ" /></div>
+  </section>
+
+  <section>
+    <h2>2. 攻撃（Attack）— 計 600ms</h2>
+    <div class="compare">
+      <div class="panel">
+        <span class="badge old">v1 · 4コマ均等</span>
+        <img src="attack-v1.gif" alt="攻撃 v1" />
+        <p class="meta">150ms×4<br>斬撃で本体が左ワープ</p>
+      </div>
+      <div class="panel">
+        <span class="badge guide">v2 · 8コマ素出し</span>
+        <img src="attack-v2.gif" alt="攻撃 v2" />
+        <p class="meta">40msスミア＋100ms決め<br>支持足ブレ 44.68px</p>
+      </div>
+      <div class="panel highlight">
+        <span class="badge new">① v2-locked · 精密ロック</span>
+        <img src="attack-v2-locked.gif" alt="攻撃 v2 精密ロック" />
+        <p class="meta">支持足釘付け＋個別倍率<br>支持足ブレ 0.35px</p>
+      </div>
+      <div class="panel rig">
+        <span class="badge rig">③ v3-rig · ボーン駆動</span>
+        <img src="attack-v3-rig.gif" alt="攻撃 v3 ボーン駆動" />
+        <p class="meta">骨格追従＋ハイブリッドFX<br>頭・接地ズレ 0.0px</p>
+      </div>
+    </div>
+    <div class="strip-label">① 精密ロック（AIコマ描き） 全8コマ</div>
+    <div class="strip-wrap"><img src="attack-v2-locked-strip.png" alt="攻撃 v2-locked 全8コマ" /></div>
+    <div class="strip-label">③ ボーン駆動ハイブリッド 全8コマ</div>
+    <div class="strip-wrap"><img src="attack-v3-rig-strip.png" alt="攻撃 v3-rig 全8コマ" /></div>
+  </section>
+</main>
+</body>
+</html>
