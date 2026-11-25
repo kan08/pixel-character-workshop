@@ -64,6 +64,34 @@ async function pixels(image) {
 
 const hexColor = (r, g, b) => '#' + [r, g, b].map(byte => byte.toString(16).padStart(2, '0')).join('');
 
+export async function prepareRecolor(image, area) {
+  const { x, y, width, height } = area;
+  if (![x, y, width, height].every(Number.isInteger) || x < 0 || y < 0 || width < 1
+    || height < 1 || width > 12 || height > 12 || x + width > image.width || y + height > image.height) {
+    throw new Error('画像内に収まる最大12×12pxの範囲を指定してください。');
+  }
+  const target = canvas(image.width, image.height);
+  const context = target.getContext('2d', { willReadFrequently: true });
+  context.drawImage(await bitmapFor(image), 0, 0);
+  const patch = context.getImageData(x, y, width, height);
+  const cells = Array.from({ length: width * height }, (_, i) => {
+    const offset = i * 4;
+    const [red, green, blue, alpha] = patch.data.subarray(offset, offset + 4);
+    return alpha === 255 ? hexColor(red, green, blue) : null;
+  });
+  return {
+    cells,
+    apply(edits, palette) {
+      for (const { cell, color } of edits) {
+        const rgb = Number.parseInt(palette[color].slice(1), 16);
+        patch.data.set([rgb >> 16, rgb >> 8 & 255, rgb & 255], cell * 4);
+      }
+      context.putImageData(patch, x, y);
+      return { ...image, url: target.toDataURL('image/png') };
+    },
+  };
+}
+
 export async function colorSet(image) {
   const data = await pixels(image);
   const colors = new Set();

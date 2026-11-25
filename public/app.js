@@ -2,7 +2,7 @@ import {
   adopt, clipIssues, frameLimit, framesEqual, maxDuration, minDuration, motions,
   newProject, parseProject, planExport, poses, restore, setBasis,
 } from './project.js';
-import { bitmapFor, canvas, colorSet, imageIssues, pixelDiff, readPng, toPngBlob } from './images.js';
+import { bitmapFor, canvas, colorSet, imageIssues, pixelDiff, prepareRecolor, readPng, toPngBlob } from './images.js';
 import { sampleProject } from './sample.js';
 
 const tabs = {
@@ -32,6 +32,8 @@ let lightBackground = false;
 let drawVersion = 0;
 let checked = null;
 let diffVersion = 0;
+let candidate = null;
+let spriteBounds = null;
 
 const currentClip = () => project.clips[motion];
 const selectedFrame = () => currentClip().frames[frameIndex];
@@ -62,6 +64,7 @@ function changed() {
 
 function setProject(next) {
   project = next;
+  candidate = null;
   motion = 'walk';
   frameIndex = 0;
   archiveId = null;
@@ -123,8 +126,77 @@ function renderFrames() {
         ${button('前へ', 'frame-earlier', frameIndex === 0 ? 'disabled' : '')}
         ${button('後ろへ', 'frame-later', frameIndex === count - 1 ? 'disabled' : '')}
       </div>
-      <div class="actions">${button('差し替え', 'frame-replace')}${button('コマを外す', 'frame-remove')}</div>` : '<p>同じ寸法のPNGを、再生順に追加してください。</p>'}
+      <div class="actions">${button('差し替え', 'frame-replace')}${button('コマを外す', 'frame-remove')}</div>
+      ${renderRecolor(frame)}` : '<p>同じ寸法のPNGを、再生順に追加してください。</p>'}
     </div>`;
+}
+
+function activeCandidate() {
+  const frame = selectedFrame();
+  return candidate?.frame === frame && candidate?.sourceId === frame?.imageId
+    && candidate?.basisVersion === project.basisVersion ? candidate : null;
+}
+
+function renderRecolor(frame) {
+  const image = imageFor(frame);
+  const draft = activeCandidate();
+  const { x, y, width, height } = draft?.area ?? { x: 0, y: 0, width: 1, height: 1 };
+  return `<details ${draft ? 'open' : ''}>
+    <summary>AIで部分修正</summary>
+    <form class="field" data-form="recolor">
+      <p>プレビューをクリックすると開始位置を選べます。範囲内の不透明な画素を共通パレットで塗り替える候補を作ります。</p>
+      <div class="fields">
+        ${field('開始 X', number('x', x, 0, image.width - 1))}
+        ${field('開始 Y', number('y', y, 0, image.height - 1))}
+        ${field('幅', number('width', width, 1, Math.min(12, image.width)))}
+        ${field('高さ', number('height', height, 1, Math.min(12, image.height)))}
+      </div>
+      ${field('修正の指示', `<textarea name="instruction" rows="2" maxlength="300" required>${esc(draft?.instruction ?? '')}</textarea>`)}
+      <button type="submit">候補を生成</button>
+    </form>
+    ${draft ? `<div class="comparison">
+      <div class="small-image">${thumb(image)}<span>現在</span></div>
+      <div class="small-image">${thumb(draft.image)}<span>候補</span></div>
+    </div>
+    <p>${draft.changes}画素の差分 · ${esc(draft.model)}</p>
+    <div class="actions">${button('候補を下書きに反映', 'apply-recolor')}${button('候補を閉じる', 'dismiss-recolor')}</div>` : ''}
+  </details>`;
+}
+
+async function generateRecolor(values) {
+  const frame = selectedFrame();
+  const source = imageFor(frame);
+  const area = Object.fromEntries(['x', 'y', 'width', 'height'].map(key => [key, Number(values.get(key))]));
+  const instruction = values.get('instruction').trim();
+  if (!instruction) throw new Error('修正の指示を入力してください。');
+  const palette = project.basis.palette.length ? project.basis.palette : await colorSet(source);
+  if (palette.length < 2 || palette.length > 256) throw new Error('2〜256色の共通パレットを設定してください。');
+  const patch = await prepareRecolor(source, area);
+  announce('ローカルのOllamaで候補を生成しています。');
+  const response = await fetch('/api/pixel-edits', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ width: area.width, height: area.height, cells: patch.cells, palette, instruction }),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error);
+  const image = patch.apply(result.edits, palette);
+  const changes = await pixelDiff(source, image);
+  if (changes !== result.edits.length) throw new Error('候補の変更が指定範囲の画素と一致しませんでした。');
+  candidate = { frame, sourceId: frame.imageId, basisVersion: project.basisVersion,
+    image, changes, area, instruction, model: result.model };
+  render();
+  announce('候補を生成しました。元のコマと見比べてください。');
+}
+
+function applyRecolor() {
+  const draft = activeCandidate();
+  if (!draft) throw new Error('このコマの候補を生成してください。');
+  const { image, sourceId, area, instruction, model } = draft;
+  const next = { ...image, name: 'AI修正候補.png', generation: { sourceId, area, instruction, model } };
+  draft.frame.imageId = addImage(next);
+  candidate = null;
+  changed();
+  announce('候補を下書きに反映しました。比較・採用タブで確認してください。');
 }
 
 function renderCompare() {
@@ -168,6 +240,7 @@ const inspectors = { basis: renderBasis, poses: renderPoses, frames: renderFrame
 const playLabel = () => playing ? '停止' : tab === 'export' && motion === 'walk' ? '移動プレビューを再生' : '再生';
 
 function render() {
+  spriteBounds = null;
   document.getElementById('project-name').textContent = project.name;
   const { width, height, x, y } = project.basis;
   document.getElementById('project-spec').textContent = `${width} × ${height}px　·　足元 (${x}, ${y})${dirty ? '　·　未保存の変更あり' : ''}`;
@@ -243,7 +316,18 @@ async function paint(index, displacement) {
     const offset = basis.direction === 'left' ? -displacement : displacement;
     const left = Math.floor((width - bitmap.width * zoom) / 2) + offset;
     const top = Math.floor((height - bitmap.height * zoom) / 2);
+    spriteBounds = { left, top, zoom, width: bitmap.width, height: bitmap.height };
     context.drawImage(bitmap, left, top, bitmap.width * zoom, bitmap.height * zoom);
+    const form = workspace.querySelector('details[open] form[data-form="recolor"]');
+    preview.classList.toggle('pick-area', Boolean(form) && !playing);
+    if (form && !playing) {
+      const [x, y, w, h] = ['x', 'y', 'width', 'height'].map(key => form.elements.namedItem(key).valueAsNumber);
+      if ([x, y, w, h].every(Number.isInteger) && x >= 0 && y >= 0 && w > 0 && h > 0
+        && x + w <= bitmap.width && y + h <= bitmap.height) {
+        context.strokeStyle = '#c8b6fb';
+        context.strokeRect(left + x * zoom + .5, top + y * zoom + .5, w * zoom, h * zoom);
+      }
+    }
     if (tab === 'basis') {
       context.fillStyle = '#d9b9ff';
       context.fillRect(left + basis.x * zoom, floor - 4, 1, 9);
@@ -456,6 +540,8 @@ const actions = {
   },
   'frame-earlier': () => moveFrame(-1),
   'frame-later': () => moveFrame(1),
+  'apply-recolor': applyRecolor,
+  'dismiss-recolor': () => { candidate = null; render(); },
   restore: () => { restore(project, motion, oldRevision().id); frameIndex = 0; changed(); announce('履歴の内容を下書きに戻しました。'); },
   validate: async () => { const result = await inspectExport(); render(); announce(result.issues.length ? '検査で修正箇所が見つかりました。' : '画像とシートの検査に合格しました。', Boolean(result.issues.length)); },
   'export-png': () => exportFile('png'),
@@ -469,6 +555,27 @@ document.addEventListener('click', event => {
   if (!['play', 'size', 'background'].includes(action)) stopPlayback();
   task(() => actions[action](buttonEl));
 });
+
+workspace.addEventListener('click', event => {
+  if (event.target.id !== 'preview' || !spriteBounds || playing || busy) return;
+  const form = workspace.querySelector('details[open] form[data-form="recolor"]');
+  if (!form) return;
+  const preview = event.target;
+  const bounds = preview.getBoundingClientRect();
+  const { left, top, zoom, width, height } = spriteBounds;
+  const x = Math.floor(((event.clientX - bounds.left) * preview.width / bounds.width - left) / zoom);
+  const y = Math.floor(((event.clientY - bounds.top) * preview.height / bounds.height - top) / zoom);
+  if (x < 0 || y < 0 || x >= width || y >= height) return;
+  form.elements.namedItem('x').value = x;
+  form.elements.namedItem('y').value = y;
+  paint(frameIndex, 0);
+});
+workspace.addEventListener('input', event => {
+  if (event.target.type === 'number' && event.target.form?.dataset.form === 'recolor') paint(frameIndex, 0);
+});
+workspace.addEventListener('toggle', event => {
+  if (event.target.querySelector('form[data-form="recolor"]')) paint(frameIndex, 0);
+}, true);
 
 document.addEventListener('keydown', event => {
   if (busy || event.target.getAttribute('role') !== 'tab') return;
@@ -507,6 +614,7 @@ document.addEventListener('submit', event => {
   const values = new FormData(event.target);
   stopPlayback();
   task(() => {
+    if (event.target.dataset.form === 'recolor') return generateRecolor(values);
     if (event.target.dataset.form === 'adopt') {
       adopt(project, motion, values.get('note'));
       changed();
