@@ -30,7 +30,7 @@ async function editRoute(request, response) {
     request.setEncoding('utf8');
     for await (const chunk of request) {
       body += chunk;
-      if (body.length > 12000) {
+      if (body.length > 2_012_000) {
         json(response, 413, { error: '入力サイズが上限を超えています。' });
         return;
       }

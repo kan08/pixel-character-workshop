@@ -13,7 +13,7 @@ test('model edits preserve transparent cells and use only allowed colors and pos
   assert.throws(() => validateEdits([{ cell: 0, color: 0 }], input), /提案しませんでした/);
 });
 
-test('invalid dimensions fail before contacting Ollama', async () => {
+test('invalid dimensions fail before contacting Hermes', async () => {
   const result = await generateEdits({ width: 13, height: 1, cells: [], palette: [], instruction: 'test' });
   assert.equal(result.status, 400);
 });

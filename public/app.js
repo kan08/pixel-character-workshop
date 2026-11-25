@@ -144,7 +144,7 @@ function renderRecolor(frame) {
   return `<details ${draft ? 'open' : ''}>
     <summary>AIで部分修正</summary>
     <form class="field" data-form="recolor">
-      <p>プレビューをクリックすると開始位置を選べます。範囲内の不透明な画素を共通パレットで塗り替える候補を作ります。</p>
+      <p>プレビューで開始位置を選べます。生成すると、対象コマと指示をHermes経由でCodexに送り、範囲内の塗り替え候補を作ります。</p>
       <div class="fields">
         ${field('開始 X', number('x', x, 0, image.width - 1))}
         ${field('開始 Y', number('y', y, 0, image.height - 1))}
@@ -154,16 +154,21 @@ function renderRecolor(frame) {
       ${field('修正の指示', `<textarea name="instruction" rows="2" maxlength="300" required>${esc(draft?.instruction ?? '')}</textarea>`)}
       <button type="submit">候補を生成</button>
     </form>
-    ${draft ? `<div class="comparison">
+    ${draft ? `<div id="recolor-candidate"><div class="comparison">
       <div class="small-image">${thumb(image)}<span>現在</span></div>
       <div class="small-image">${thumb(draft.image)}<span>候補</span></div>
     </div>
     <p>${draft.changes}画素の差分 · ${esc(draft.model)}</p>
-    <div class="actions">${button('候補を下書きに反映', 'apply-recolor')}${button('候補を閉じる', 'dismiss-recolor')}</div>` : ''}
+    <div class="actions">${button('候補を下書きに反映', 'apply-recolor')}${button('候補を閉じる', 'dismiss-recolor')}</div></div>` : ''}
   </details>`;
 }
 
-async function generateRecolor(values) {
+function clearRecolorCandidate() {
+  candidate = null;
+  document.getElementById('recolor-candidate')?.remove();
+}
+
+async function generateRecolor(values, form) {
   const frame = selectedFrame();
   const source = imageFor(frame);
   const area = Object.fromEntries(['x', 'y', 'width', 'height'].map(key => [key, Number(values.get(key))]));
@@ -172,16 +177,23 @@ async function generateRecolor(values) {
   const palette = project.basis.palette.length ? project.basis.palette : await colorSet(source);
   if (palette.length < 2 || palette.length > 256) throw new Error('2〜256色の共通パレットを設定してください。');
   const patch = await prepareRecolor(source, area);
-  announce('ローカルのOllamaで候補を生成しています。');
+  clearRecolorCandidate();
+  announce('Hermes経由でCodexの修正候補を待っています。');
   const response = await fetch('/api/pixel-edits', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ width: area.width, height: area.height, cells: patch.cells, palette, instruction }),
+    body: JSON.stringify({ width: area.width, height: area.height, cells: patch.cells,
+      palette, instruction, image: source.url }),
   });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error);
   const image = patch.apply(result.edits, palette);
   const changes = await pixelDiff(source, image);
   if (changes !== result.edits.length) throw new Error('候補の変更が指定範囲の画素と一致しませんでした。');
+  const currentValues = new FormData(form);
+  if ([...values].some(([key, value]) => currentValues.get(key) !== value)) {
+    announce('指定が変わりました。現在の範囲と指示で生成してください。');
+    return;
+  }
   candidate = { frame, sourceId: frame.imageId, basisVersion: project.basisVersion,
     image, changes, area, instruction, model: result.model };
   render();
@@ -566,12 +578,17 @@ workspace.addEventListener('click', event => {
   const x = Math.floor(((event.clientX - bounds.left) * preview.width / bounds.width - left) / zoom);
   const y = Math.floor(((event.clientY - bounds.top) * preview.height / bounds.height - top) / zoom);
   if (x < 0 || y < 0 || x >= width || y >= height) return;
+  if (Number(form.elements.namedItem('x').value) !== x || Number(form.elements.namedItem('y').value) !== y) {
+    clearRecolorCandidate();
+  }
   form.elements.namedItem('x').value = x;
   form.elements.namedItem('y').value = y;
   paint(frameIndex, 0);
 });
 workspace.addEventListener('input', event => {
-  if (event.target.type === 'number' && event.target.form?.dataset.form === 'recolor') paint(frameIndex, 0);
+  if (event.target.form?.dataset.form !== 'recolor') return;
+  clearRecolorCandidate();
+  if (event.target.type === 'number') paint(frameIndex, 0);
 });
 workspace.addEventListener('toggle', event => {
   if (event.target.querySelector('form[data-form="recolor"]')) paint(frameIndex, 0);
@@ -614,7 +631,7 @@ document.addEventListener('submit', event => {
   const values = new FormData(event.target);
   stopPlayback();
   task(() => {
-    if (event.target.dataset.form === 'recolor') return generateRecolor(values);
+    if (event.target.dataset.form === 'recolor') return generateRecolor(values, event.target);
     if (event.target.dataset.form === 'adopt') {
       adopt(project, motion, values.get('note'));
       changed();
